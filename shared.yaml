@@ -1,0 +1,79 @@
+- &common
+  version: '0.1.0.0'
+  author: Samuel Schlesinger
+  maintainer: Samuel Schlesinger
+  license: AllRightsReserved
+  copyright: 2019 Samuel Schlesinger
+  default-extensions:
+  - ApplicativeDo
+  - BangPatterns
+  - BinaryLiterals
+  - BlockArguments
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveDataTypeable
+  - DeriveGeneric
+  - DerivingStrategies
+  - EmptyDataDecls
+  - ExistentialQuantification
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - KindSignatures
+  - LambdaCase
+  - MonadComprehensions
+  - MultiParamTypeClasses
+  - NoMonomorphismRestriction
+  - NPlusKPatterns
+  - OverloadedStrings
+  - PackageImports
+  - PatternSynonyms
+  - PolyKinds
+  - QuantifiedConstraints
+  - QuasiQuotes
+  - RankNTypes
+  - NamedFieldPuns
+  - NumericUnderscores
+  - RecordWildCards
+  - RecursiveDo
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TemplateHaskell
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeFamilyDependencies
+  - TypeOperators
+  - ViewPatterns
+
+- &executable
+  ghc-options:
+    - -Wall
+    - -Werror
+    - -fwarn-tabs
+    - -Wincomplete-uni-patterns
+    - -O2
+    - -threaded
+    - -rtsopts
+    - '"-with-rtsopts=-N -T"'
+
+- &test
+  ghc-options:
+    - -Wall
+    - -Werror
+    - -fwarn-tabs
+    - -Wincomplete-patterns
+    - -O2
+    - -threaded
+    - '"-with-rtsopts=-N -T"'
+
+- &library
+  ghc-options:
+    - -Wall
+    - -Werror
+    - -fwarn-tabs
+    - -Wincomplete-uni-patterns
+    - -O2
