@@ -1,3 +1,4 @@
 resolver: nightly-2019-10-27
 packages:
-- ./package
+- ./environment-core
+- ./commander

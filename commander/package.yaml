@@ -1,0 +1,35 @@
+_common: !include "../shared.yaml"
+
+name: commander
+<<: *common
+
+dependencies:
+  - base
+
+library:
+  source-dirs:
+    - src
+  dependencies:
+    - base
+    - containers
+    - mtl
+    - text
+    - transformers
+    - unordered-containers
+  <<: *library
+
+executables:
+  exe:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - commander
+    <<: *executable
+
+tests:
+  test:
+    main: Test.hs
+    source-dirs: test
+    dependencies:
+      - commander
+    <<: *test
