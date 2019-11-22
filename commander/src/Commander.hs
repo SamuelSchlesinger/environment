@@ -188,7 +188,7 @@ initialState = do
     where
       takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
       takeOptions = go [] [] [] where
-        go opts args flags (('`':x') : z) = go opts args (pack x' : flags) z
+        go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
         go opts args flags (('-':'-':x) : y : z) = go ((pack x, pack y) : opts) args flags z 
         go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
         go opts args flags (x : y) = go opts (pack x : args) flags y
