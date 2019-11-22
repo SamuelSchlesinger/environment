@@ -1,7 +1,7 @@
 module Control.List where
 
 import Control.Natural
-import GHC.Types (Constraint)
+import GHC.Exts (Constraint)
 
 type family Index (t :: k) (ts :: [k]) where
   Index t (t ': ts) = 'Z

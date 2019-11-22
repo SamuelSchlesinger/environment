@@ -20,9 +20,11 @@ import qualified Control.Monad.Stack.Trans as Stack
 
 data Arg :: Symbol -> * -> *
 
-data Opt :: Symbol -> Symbol -> * -> *
+data Opt :: Symbol -> Symbol -> Symbol -> * -> *
 
 data Doc :: Symbol -> *
+
+data Named :: Symbol -> *
 
 data (...) :: k -> k' -> *
 infixr 4 ...
@@ -137,6 +139,7 @@ class HasProgram p where
   data ProgramT p (m :: * -> *)
   run :: ProgramT p IO -> CommanderT [Event] State IO ()
   hoist :: (forall x. m x -> n x) -> ProgramT p m -> ProgramT p n 
+  invocations :: [Text]
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t ... p) where
   newtype ProgramT (Arg name t ... p) m = ArgProgramT { unArgProgramT :: t -> ProgramT p m }
@@ -148,11 +151,13 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
           Nothing -> return (Defeat [BadArgument x (pack $ symbolVal (Proxy @name))], State{..})
       [] -> return (Defeat mempty, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
+  invocations = [(("<" <> pack (symbolVal (Proxy @name)) <> "> ") <>)] <*> invocations @p
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m = ProgramT x m :+: ProgramT y m
   run (f :+: g) = run f <|> run g
   hoist n (f :+: g) = hoist n f :+: hoist n g
+  invocations = invocations @x <> invocations @y
 
 infixr 2 :+:
 
@@ -160,9 +165,10 @@ instance HasProgram Raw where
   newtype ProgramT Raw m = RawProgramT { unRawProgramT :: m () }
   run = summaryAction [Success] . liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
+  invocations = [mempty]
 
-instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t)) => HasProgram (Opt long short t ... p) where
-  newtype ProgramT (Opt long short t ... p) m = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m }
+instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t)) => HasProgram (Opt name long short t ... p) where
+  newtype ProgramT (Opt name long short t ... p) m = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m }
   run f = Action $ \State{..} -> do
     case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
       Just opt' -> 
@@ -171,6 +177,8 @@ instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t))
           Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
+  invocations = [ (("-" <> (pack $ symbolVal (Proxy @short)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)
+                , (("--" <> (pack $ symbolVal (Proxy @long)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag ... p) where
   newtype ProgramT (Flag flag ... p) m = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m }
@@ -178,11 +186,19 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag ... p) where
     let presence = HashSet.member (pack (symbolVal (Proxy @flag))) flags
     return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
+  invocations = [(("~" <> (pack $ symbolVal (Proxy @flag)) <> " ") <>)] <*> invocations @p
 
-instance HasProgram p => HasProgram (Doc doc ... p) where
+instance (KnownSymbol name, HasProgram p) => HasProgram (Named name ... p) where
+  newtype ProgramT (Named name ...p) m = NamedProgramT { unNamedProgramT :: ProgramT p m }
+  run = run . unNamedProgramT 
+  hoist n = NamedProgramT . hoist n . unNamedProgramT
+  invocations = [((pack (symbolVal (Proxy @name)) <> " ") <>)] <*> invocations @p
+
+instance (KnownSymbol doc, HasProgram p) => HasProgram (Doc doc ... p) where
   newtype ProgramT (Doc doc ...p) m = DocProgramT { unDocProgramT :: ProgramT p m }
   run = run . unDocProgramT 
   hoist n = DocProgramT . hoist n . unDocProgramT
+  invocations = [(pack $ symbolVal (Proxy @doc))] <> invocations @p
 
 instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
   newtype ProgramT (seg ... p) m = SegProgramT { unSegProgramT :: ProgramT p m }
@@ -192,6 +208,7 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
                                                         else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
       [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
   hoist n = SegProgramT . hoist n . unSegProgramT
+  invocations = [((pack $ symbolVal (Proxy @seg) <> " ") <> )] <*> invocations @p
  
 initialState :: IO State
 initialState = do
@@ -216,7 +233,7 @@ commander prog = fmap fst $ initialState >>= runCommanderT (run prog)
 arg :: KnownSymbol name => (x -> ProgramT p m) -> ProgramT (Arg name x ... p) m 
 arg = ArgProgramT
 
-opt :: (KnownSymbol long, KnownSymbol short) => (Maybe x -> ProgramT p m) -> ProgramT (Opt long short x ... p) m
+opt :: (KnownSymbol name, KnownSymbol long, KnownSymbol short) => (Maybe x -> ProgramT p m) -> ProgramT (Opt name long short x ... p) m
 opt = OptProgramT
 
 doc :: KnownSymbol doc => ProgramT p m -> ProgramT (Doc doc ... p) m
@@ -227,6 +244,9 @@ raw = RawProgramT
 
 sub :: KnownSymbol s => ProgramT p m -> ProgramT (s ... p) m
 sub = SegProgramT
+
+named :: KnownSymbol s => ProgramT p m -> ProgramT (Named s  ... p) m
+named = NamedProgramT
 
 flag :: KnownSymbol f => (Bool -> ProgramT p m) -> ProgramT (Flag f ... p) m
 flag = FlagProgramT

@@ -24,6 +24,7 @@ executables:
     main: Main.hs
     source-dirs: app
     dependencies:
+      - text
       - commander
     <<: *executable
 
