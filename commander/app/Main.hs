@@ -1,6 +1,9 @@
 module Main where
 
-import qualified Commander
+import Commander (commander, arg, raw)
 
 main :: IO ()
-main = Commander.main
+main = do
+  x <- commander $ arg @"name" @String \name -> raw $ do
+    putStrLn $ "My name is " <> name
+  print x

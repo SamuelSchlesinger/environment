@@ -19,7 +19,7 @@ library:
   <<: *library
 
 executables:
-  exe:
+  commander-example:
     main: Main.hs
     source-dirs: app
     dependencies:
@@ -27,7 +27,7 @@ executables:
     <<: *executable
 
 tests:
-  test:
+  commander-test:
     main: Test.hs
     source-dirs: test
     dependencies:

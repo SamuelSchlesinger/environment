@@ -12,7 +12,7 @@ import Control.Monad.Trans (MonadIO(..))
 import Data.HashSet (HashSet)
 import Data.HashMap.Strict as HashMap
 import Data.Proxy (Proxy(..))
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import System.Environment (getArgs)
 
@@ -34,6 +34,12 @@ infixr 2 +
 
 class Unrender t where
   unrender :: Text -> Maybe t
+
+instance Unrender String where
+  unrender = Just . unpack
+
+instance Unrender Text where
+  unrender = Just
 
 data CommanderT summary state m a
   = Action (state -> m (CommanderT summary state m a, state, summary))
@@ -96,6 +102,7 @@ data Event
   | BadArgument Text
   | WrongBranch Text
   | Success
+  deriving (Show, Eq, Ord)
 
 class HasProgram p where
   data ProgramT p (m :: * -> *)
@@ -129,8 +136,8 @@ instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t))
   newtype ProgramT (Opt long short t ... p) m = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m }
   run f = Action $ \State{..} -> do
     case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
-      Just opt -> 
-        case unrender opt of
+      Just opt' -> 
+        case unrender opt' of
           Just t -> return (run (unOptProgramT f t), State{..}, mempty)
           Nothing -> return (Defeat [BadOption (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..}, mempty)
       Nothing  -> return (run (unOptProgramT f Nothing), State{..}, mempty)
@@ -163,5 +170,25 @@ initialState = do
         go opts args (x : y) = go opts (pack x : args) y
         go opts args [] = (opts, reverse args)
 
-commander :: HasProgram p => ProgramT p IO -> IO ()
-commander prog = void $ initialState >>= runCommanderT (run prog)
+commander_ :: HasProgram p => ProgramT p IO -> IO ()
+commander_ prog = void $ initialState >>= runCommanderT (run prog)
+
+commander :: HasProgram p => ProgramT p IO -> IO [Event]
+commander prog = fmap fst $ initialState >>= runCommanderT (run prog)
+
+arg :: KnownSymbol name => (x -> ProgramT p m) -> ProgramT (Arg name x ... p) m 
+arg = ArgProgramT
+
+opt :: (KnownSymbol long, KnownSymbol short) => (Maybe x -> ProgramT p m) -> ProgramT (Opt long short x ... p) m
+opt = OptProgramT
+
+doc :: KnownSymbol doc => ProgramT p m -> ProgramT (Doc doc ... p) m
+doc = DocProgramT
+
+raw :: m () -> ProgramT Raw m
+raw = RawProgramT
+
+(<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
+(<+>) = (:+:)
+
+infixr 2 <+>

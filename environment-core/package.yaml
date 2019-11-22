@@ -13,16 +13,8 @@ library:
     - base
   <<: *library
 
-executables:
-  exe:
-    main: Main.hs
-    source-dirs: app
-    dependencies:
-      - environment-core
-    <<: *executable
-
 tests:
-  test:
+  environment-core-test:
     main: Test.hs
     source-dirs: test
     dependencies:
