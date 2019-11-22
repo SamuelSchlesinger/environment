@@ -22,8 +22,6 @@ data Arg :: Symbol -> * -> *
 
 data Opt :: Symbol -> Symbol -> Symbol -> * -> *
 
-data Doc :: Symbol -> *
-
 data Named :: Symbol -> *
 
 data (...) :: k -> k' -> *
@@ -194,12 +192,6 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name ... p) where
   hoist n = NamedProgramT . hoist n . unNamedProgramT
   invocations = [((pack (symbolVal (Proxy @name)) <> " ") <>)] <*> invocations @p
 
-instance (KnownSymbol doc, HasProgram p) => HasProgram (Doc doc ... p) where
-  newtype ProgramT (Doc doc ...p) m = DocProgramT { unDocProgramT :: ProgramT p m }
-  run = run . unDocProgramT 
-  hoist n = DocProgramT . hoist n . unDocProgramT
-  invocations = [(pack $ symbolVal (Proxy @doc))] <> invocations @p
-
 instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
   newtype ProgramT (seg ... p) m = SegProgramT { unSegProgramT :: ProgramT p m }
   run s = Action $ \State{..} -> do 
@@ -235,9 +227,6 @@ arg = ArgProgramT
 
 opt :: (KnownSymbol name, KnownSymbol long, KnownSymbol short) => (Maybe x -> ProgramT p m) -> ProgramT (Opt name long short x ... p) m
 opt = OptProgramT
-
-doc :: KnownSymbol doc => ProgramT p m -> ProgramT (Doc doc ... p) m
-doc = DocProgramT
 
 raw :: m () -> ProgramT Raw m
 raw = RawProgramT

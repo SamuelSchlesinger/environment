@@ -1,0 +1,25 @@
+_common: !include "../shared.yaml"
+
+name: scripts
+<<: *common
+
+dependencies:
+  - base
+
+executables:
+  edit-script:
+    main: EditScript.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - environment-core
+    <<: *executable
+
+tests:
+  scripts-test:
+    main: Test.hs
+    source-dirs: test
+    dependencies:
+      - scripts
+    <<: *test

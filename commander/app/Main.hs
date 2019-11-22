@@ -7,14 +7,24 @@ import Control.Monad
 
 type FileReader = Arg "file" FilePath ... Raw
 type FileWriter = Arg "file" FilePath ... Arg "string" String ... Raw
-type Help = Raw
+type Help = Flag "nohelp" ... Raw
 type FileProgram = Named "commander-example" ... Flag "verbose" ... ("read" ... FileReader + "write" ... FileWriter + Help)
 
 program :: ProgramT FileProgram IO
 program = named $ flag \verbosity -> sub (fileReader verbosity) <+> sub (fileWriter verbosity) <+> help where
-  fileReader verbose = arg(raw . (readFile >=> putStrLn >=> if verbose then \_ -> putStrLn "Finished!" else return))
-  fileWriter verbose = arg \file -> arg (raw . (writeFile file >=> if verbose then \_ -> putStrLn "Finished" else return)) 
-  help = raw . void $ traverse (putStrLn . unpack) (invocations @FileProgram)
+  fileReader verbose = arg \file -> raw $ do
+    readFile file >>= putStrLn 
+    if verbose then putStrLn "Finished"
+               else return ()
+  fileWriter verbose = arg \file -> arg $ \text -> raw $ do
+    writeFile file text
+    if verbose then putStrLn "Finished" 
+               else return () 
+  help = flag \helpOff -> 
+    if not helpOff then raw $ do
+      putStrLn "usage: "
+      void $ traverse (putStrLn . unpack) $ invocations @FileProgram 
+    else raw $ pure ()
 
 main :: IO ()
 main = commander_ program
