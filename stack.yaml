@@ -3,3 +3,4 @@ packages:
 - ./environment-core
 - ./commander
 - ./mtsl
+- ./scripts

@@ -8,9 +8,12 @@ dependencies:
 
 executables:
   edit-script:
-    main: EditScript.hs
+    main: edit-script.hs
     source-dirs: src
     dependencies:
+      - text
+      - process
+      - directory
       - base
       - commander
       - environment-core
