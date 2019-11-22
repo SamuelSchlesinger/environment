@@ -9,12 +9,13 @@ module Commander where
 import Control.Applicative (Alternative(..))
 import Control.Monad (ap, void)
 import Control.Monad.Trans (MonadIO(..))
-import Data.HashSet (HashSet)
+import Data.HashSet as HashSet
 import Data.HashMap.Strict as HashMap
 import Data.Proxy (Proxy(..))
 import Data.Text (Text, pack, unpack)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import System.Environment (getArgs)
+import Data.Text.Read (decimal, signed)
 
 data Arg :: Symbol -> * -> *
 
@@ -40,6 +41,24 @@ instance Unrender String where
 
 instance Unrender Text where
   unrender = Just
+
+instance Unrender Bool where
+  unrender = flip Prelude.lookup [("True", True), ("False", False)]
+
+instance Unrender Integer where
+  unrender = either (const Nothing) h . signed decimal where
+    h (n, "") = Just n
+    h _ = Nothing
+
+instance Unrender Int where
+  unrender = either (const Nothing) h . signed decimal where
+    h (n, "") = Just n
+    h _ = Nothing
+
+instance Unrender Word where
+  unrender = either (const Nothing) h . decimal where
+    h (n, "") = Just n
+    h _ = Nothing
 
 data CommanderT summary state m a
   = Action (state -> m (CommanderT summary state m a, state))
@@ -82,14 +101,13 @@ instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
 
 instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) where
   empty = Defeat mempty 
-  Defeat summary <|> Defeat summary' = Defeat (summary <> summary')
-  Defeat summary <|> a  = summaryAction summary a
-  Victory summary a <|> _ = Victory summary a 
+  Defeat summary <|> a  = summaryAction summary a -- we must remember out defeats
+  v@(Victory _ _) <|> _ = v -- if we have succeeded, we don't need to try another strategy
   Action action <|> p = Action \state -> do
-    (action', state') <- action state
-    return (action' <|> p, state')     
+    (action', state') <- action state 
+    return (action' <|> p, state')  -- the state monad with backtracking!
 
-data State = State
+data State = State 
   { arguments :: [Text]
   , options :: HashMap Text Text
   , flags :: HashSet Text }
@@ -97,6 +115,7 @@ data State = State
 data Event 
   = BadOption Text Text
   | BadArgument Text
+  | TryingBranch Text
   | WrongBranch Text
   | Success
   deriving (Show, Eq, Ord)
@@ -140,6 +159,13 @@ instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t))
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
 
+instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag ... p) where
+  newtype ProgramT (Flag flag ... p) m = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m }
+  run f = Action $ \State{..} -> do
+    let presence = HashSet.member (pack (symbolVal (Proxy @flag))) flags
+    return (run (unFlagProgramT f presence), State{..})
+  hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
+
 instance HasProgram p => HasProgram (Doc doc ... p) where
   newtype ProgramT (Doc doc ...p) m = DocProgramT { unDocProgramT :: ProgramT p m }
   run = run . unDocProgramT 
@@ -149,7 +175,7 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
   newtype ProgramT (seg ... p) m = SegProgramT { unSegProgramT :: ProgramT p m }
   run s = Action $ \State{..} -> do 
     case arguments of
-      (x : xs) -> if x == pack (symbolVal $ Proxy @seg) then return (run $ unSegProgramT s, State{arguments = xs, ..})
+      (x : xs) -> if x == pack (symbolVal $ Proxy @seg) then return (summaryAction [TryingBranch (pack . symbolVal $ Proxy @seg)] $ run $ unSegProgramT s, State{arguments = xs, ..})
                                                         else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
       [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
   hoist n = SegProgramT . hoist n . unSegProgramT
@@ -157,15 +183,16 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
 initialState :: IO State
 initialState = do
   args <- getArgs
-  let (opts, args') = takeOptions args
-  return $ State args' (HashMap.fromList opts) mempty 
+  let (opts, args', flags) = takeOptions args
+  return $ State args' (HashMap.fromList opts) (HashSet.fromList flags) 
     where
-      takeOptions :: [String] -> ([(Text, Text)], [Text])
-      takeOptions = go [] [] where
-        go :: [(Text, Text)] -> [Text] -> [String] -> ([(Text, Text)], [Text])
-        go opts args (x'@('-':_) : y : z) = go ((pack x', pack y) : opts) args z 
-        go opts args (x : y) = go opts (pack x : args) y
-        go opts args [] = (opts, reverse args)
+      takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
+      takeOptions = go [] [] [] where
+        go opts args flags (('`':x') : z) = go opts args (pack x' : flags) z
+        go opts args flags (('-':'-':x) : y : z) = go ((pack x, pack y) : opts) args flags z 
+        go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
+        go opts args flags (x : y) = go opts (pack x : args) flags y
+        go opts args flags [] = (opts, reverse args, flags)
 
 commander_ :: HasProgram p => ProgramT p IO -> IO ()
 commander_ prog = void $ initialState >>= runCommanderT (run prog)
@@ -187,6 +214,9 @@ raw = RawProgramT
 
 sub :: KnownSymbol s => ProgramT p m -> ProgramT (s ... p) m
 sub = SegProgramT
+
+flag :: KnownSymbol f => (Bool -> ProgramT p m) -> ProgramT (Flag f ... p) m
+flag = FlagProgramT
 
 (<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
 (<+>) = (:+:)
