@@ -8,7 +8,7 @@ module Commander where
 
 import Control.Applicative (Alternative(..))
 import Control.Monad (ap, void)
-import Control.Monad.Trans (MonadIO(..))
+import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
 import Data.HashSet as HashSet
 import Data.HashMap.Strict as HashMap
 import Data.Proxy (Proxy(..))
@@ -16,6 +16,7 @@ import Data.Text (Text, pack, unpack)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import System.Environment (getArgs)
 import Data.Text.Read (decimal, signed)
+import qualified Control.Monad.Stack.Trans as Stack
 
 data Arg :: Symbol -> * -> *
 
@@ -84,6 +85,16 @@ instance (Monad m, Monoid summary) => Applicative (CommanderT summary state m) w
   (<*>) = ap
   pure = Victory mempty
 
+instance Monoid summary => Stack.MonadTrans (CommanderT summary state) where
+  lift ma = Action \state -> do
+    a <- ma
+    return (pure a, state)
+
+instance Monoid summary => MonadTrans (CommanderT summary state) where
+  lift ma = Action \state -> do
+    a <- ma
+    return (pure a, state)
+
 instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) where
   liftIO ma = Action \state -> do
     a <- liftIO ma
@@ -105,7 +116,7 @@ instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) w
   v@(Victory _ _) <|> _ = v -- if we have succeeded, we don't need to try another strategy
   Action action <|> p = Action \state -> do
     (action', state') <- action state 
-    return (action' <|> p, state')  -- the state monad with backtracking!
+    return (action' <|> p, state')  -- go back to this branch if you don't find victory
 
 data State = State 
   { arguments :: [Text]
@@ -113,8 +124,10 @@ data State = State
   , flags :: HashSet Text }
 
 data Event 
-  = BadOption Text Text
-  | BadArgument Text
+  = BadOption Text Text Text
+  | GoodOption Text
+  | BadArgument Text Text
+  | GoodArgument Text
   | TryingBranch Text
   | WrongBranch Text
   | Success
@@ -131,8 +144,8 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     case arguments of
       (x : xs) -> 
         case unrender x of
-          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
-          Nothing -> return (Defeat [BadArgument (pack $ symbolVal (Proxy @name))], State{..})
+          Just t -> return (summaryAction [GoodArgument $ pack $ symbolVal (Proxy @name)] $ run (unArgProgramT f t), State{ arguments = xs, .. })  
+          Nothing -> return (Defeat [BadArgument x (pack $ symbolVal (Proxy @name))], State{..})
       [] -> return (Defeat mempty, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
 
@@ -155,7 +168,7 @@ instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t))
       Just opt' -> 
         case unrender opt' of
           Just t -> return (run (unOptProgramT f t), State{..})
-          Nothing -> return (Defeat [BadOption (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
+          Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
 

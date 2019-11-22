@@ -10,6 +10,7 @@ library:
   source-dirs:
     - src
   dependencies:
+    - mtsl
     - base
     - containers
     - mtl
