@@ -81,11 +81,11 @@ instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
     return (action' >>= f, state')
 
 instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) where
-  empty = Defeat mempty -- the empty commander action is a defeat with no information
-  Defeat summary <|> Defeat _ = Defeat summary -- we don't need to get defeated again!
-  Defeat summary <|> a  = summaryAction summary a -- retain the knowledge from our defeat...
-  Victory summary a <|> _ = Victory summary a  -- we've already won, why do anything else?
-  Action action <|> p = Action \state -> do -- here, we descend down the left action one level
+  empty = Defeat mempty 
+  Defeat summary <|> Defeat summary' = Defeat (summary <> summary')
+  Defeat summary <|> a  = summaryAction summary a
+  Victory summary a <|> _ = Victory summary a 
+  Action action <|> p = Action \state -> do
     (action', state') <- action state
     return (action' <|> p, state')     
 
