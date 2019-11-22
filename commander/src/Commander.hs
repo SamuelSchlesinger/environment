@@ -42,7 +42,7 @@ instance Unrender Text where
   unrender = Just
 
 data CommanderT summary state m a
-  = Action (state -> m (CommanderT summary state m a, state, summary))
+  = Action (state -> m (CommanderT summary state m a, state))
   | Defeat summary
   | Victory summary a
   deriving Functor
@@ -51,13 +51,13 @@ summaryAction :: (Monoid summary, Monad m) => summary -> CommanderT summary stat
 summaryAction summary (Defeat summary') = Defeat (summary <> summary')
 summaryAction summary (Victory summary' a) = Victory (summary <> summary') a
 summaryAction summary (Action action) = Action \state -> action state >>= \case
-  (action', state', summary') -> return (summaryAction summary action', state', summary')
+  (action', state') -> return (summaryAction summary action', state')
 
 runCommanderT :: (Monoid summary, Monad m) => CommanderT summary state m a -> state -> m (summary, Maybe a)
 runCommanderT (Action action) state = do
-  (action', state', summary) <- action state
-  (summary', m) <- runCommanderT action' state'
-  return (summary <> summary', m)
+  (action', state') <- action state
+  (summary, m) <- runCommanderT action' state'
+  return (summary, m)
 runCommanderT (Defeat summary) _ = return (summary, Nothing)
 runCommanderT (Victory summary a) _ = return (summary, Just a)
 
@@ -68,20 +68,17 @@ instance (Monad m, Monoid summary) => Applicative (CommanderT summary state m) w
 instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) where
   liftIO ma = Action \state -> do
     a <- liftIO ma
-    return (pure a, state, mempty)
+    return (pure a, state)
 
 instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
   Defeat summary >>= _ = Defeat summary
   Victory summary a >>= f = case f a of
-    Action action -> Action \state -> (\(action', state', summary') -> (action', state', summary <> summary')) <$> action state
+    Action action -> Action \state -> (\(action', state') -> (action', state')) <$> action state
     Defeat summary' -> Defeat (summary <> summary')
     Victory summary' b -> Victory (summary <> summary') b
   Action action >>= f = Action \state -> do
-    (action', state', summary) <- action state
-    case action' >>= f of
-      Action action'' -> return (Action action'', state', summary)
-      Defeat summary' -> return (Defeat summary', state', summary <> summary')
-      Victory summary' b -> return (Victory summary' b, state', summary <> summary')
+    (action', state') <- action state
+    return (action' >>= f, state')
 
 instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) where
   empty = Defeat mempty -- the empty commander action is a defeat with no information
@@ -89,8 +86,8 @@ instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) w
   Defeat summary <|> a  = summaryAction summary a -- retain the knowledge from our defeat...
   Victory summary a <|> _ = Victory summary a  -- we've already won, why do anything else?
   Action action <|> p = Action \state -> do -- here, we descend down the left action one level
-    (action', state', summary) <- action state
-    return (action' <|> p, state', summary)     
+    (action', state') <- action state
+    return (action' <|> p, state')     
 
 data State = State
   { arguments :: [Text]
@@ -115,9 +112,9 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     case arguments of
       (x : xs) -> 
         case unrender x of
-          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. }, mempty)  
-          Nothing -> return (Defeat [BadArgument (pack $ symbolVal (Proxy @name))], State{..}, mempty)
-      [] -> return (Defeat mempty, State{..}, mempty)
+          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
+          Nothing -> return (Defeat [BadArgument (pack $ symbolVal (Proxy @name))], State{..})
+      [] -> return (Defeat mempty, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
@@ -129,7 +126,7 @@ infixr 2 :+:
 
 instance HasProgram Raw where
   newtype ProgramT Raw m = RawProgramT { unRawProgramT :: m () }
-  run m = liftIO $ unRawProgramT m
+  run = summaryAction [Success] . liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
 
 instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t)) => HasProgram (Opt long short t ... p) where
@@ -138,9 +135,9 @@ instance (KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t))
     case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
       Just opt' -> 
         case unrender opt' of
-          Just t -> return (run (unOptProgramT f t), State{..}, mempty)
-          Nothing -> return (Defeat [BadOption (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..}, mempty)
-      Nothing  -> return (run (unOptProgramT f Nothing), State{..}, mempty)
+          Just t -> return (run (unOptProgramT f t), State{..})
+          Nothing -> return (Defeat [BadOption (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
+      Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
 
 instance HasProgram p => HasProgram (Doc doc ... p) where
@@ -152,9 +149,9 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg ... p) where
   newtype ProgramT (seg ... p) m = SegProgramT { unSegProgramT :: ProgramT p m }
   run s = Action $ \State{..} -> do 
     case arguments of
-      (x : xs) -> if x == pack (symbolVal $ Proxy @seg) then return (run $ unSegProgramT s, State{arguments = xs, ..}, mempty)
-                                                        else return (Defeat mempty, State{..}, [WrongBranch $ pack $ symbolVal $ Proxy @seg])
-      [] -> return (Defeat mempty, State{..}, [WrongBranch $ pack $ symbolVal $ Proxy @seg])
+      (x : xs) -> if x == pack (symbolVal $ Proxy @seg) then return (run $ unSegProgramT s, State{arguments = xs, ..})
+                                                        else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
+      [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
   hoist n = SegProgramT . hoist n . unSegProgramT
  
 initialState :: IO State
@@ -187,6 +184,9 @@ doc = DocProgramT
 
 raw :: m () -> ProgramT Raw m
 raw = RawProgramT
+
+sub :: KnownSymbol s => ProgramT p m -> ProgramT (s ... p) m
+sub = SegProgramT
 
 (<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
 (<+>) = (:+:)

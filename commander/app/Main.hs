@@ -1,9 +1,11 @@
 module Main where
 
-import Commander (commander, arg, raw)
+import Commander (commander, arg, raw, (<+>), sub)
 
 main :: IO ()
 main = do
-  x <- commander $ arg @"name" @String \name -> raw $ do
-    putStrLn $ "My name is " <> name
+  let l = arg @"name" @String (raw . putStrLn . ("Hello, " <>))
+  let r = arg @"town" @String (raw . putStrLn . ("I have never been to " <>))
+  let b = sub @"hello" l <+> sub @"where" r
+  x <- commander b
   print x
