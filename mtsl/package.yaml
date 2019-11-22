@@ -1,0 +1,25 @@
+_common: !include "../shared.yaml"
+
+name: mtsl
+<<: *common
+
+dependencies:
+  - base
+
+library:
+  source-dirs:
+    - src
+  dependencies:
+    - environment-core
+    - ghc-prim
+    - comonad
+    - base
+  <<: *library
+
+tests:
+  mtsl-test:
+    main: Test.hs
+    source-dirs: test
+    dependencies:
+      - mtsl
+    <<: *test
