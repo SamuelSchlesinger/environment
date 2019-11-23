@@ -19,7 +19,24 @@ to this environment, installing them into your "~/.local/bin" so that you can us
 them immediately. The scripting library that you are able to use in these scripts
 by default is a simple type level scriping library that I wrote called commander,
 which is also located in this repository. This library should be very simple to
-get started with. Here is a complete example of a script that you could write using
+get started with. Here is a basic example script of a file reader and a file writer merged
+in as subcommands to a larger program:
+
+```haskell
+import Commander
+import Prelude
+
+main :: IO ()
+main = command_ (toplevel @"commander-example" file)
+
+file = sub @"writer" (arg @"filename" \filename ->
+                      arg @"contents" \contents ->
+                        raw $ writeFile filename contents)
+   :+: sub @"reader" (arg @"filename" \filename ->
+                        raw $ readFile filename >>= putStrLn)
+``` 
+
+Here is a complete example of a script that you could write using
 new-script that utilizes most of the combinators in the library.:
 
 ```haskell
