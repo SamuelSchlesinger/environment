@@ -112,7 +112,7 @@ instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) w
   v@(Victory _ _) <|> _ = v -- if we have succeeded, we don't need to try another strategy
   Action action <|> p = Action \state -> do
     (action', state') <- action state 
-    return (action' <|> p, state')  -- go back to this branch if you don't find victory
+    return (action' <|> p, state')  -- go back to this idea if you don't find victory
 
 data State = State 
   { arguments :: [Text]
