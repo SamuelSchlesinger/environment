@@ -44,3 +44,36 @@ executables:
       - text
       - bytestring
     <<: *executable
+  soviet:
+    main: soviet.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  wow:
+    main: wow.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  fart:
+    main: fart.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
