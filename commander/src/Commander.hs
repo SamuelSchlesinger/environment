@@ -24,7 +24,9 @@ data Opt :: Symbol -> Symbol -> Symbol -> * -> *
 
 data Named :: Symbol -> *
 
-data (...) :: k -> k' -> *
+data Help :: * -> *
+
+data (...) :: k -> * -> *
 infixr 4 ...
 
 data Raw :: *
@@ -165,6 +167,15 @@ instance HasProgram Raw where
   hoist n (RawProgramT m) = RawProgramT (n m)
   invocations = [mempty]
 
+instance HasProgram p => HasProgram (Help p) where
+  data ProgramT (Help p) m = HelpProgramT
+  run _ = liftIO $ do
+    putStrLn "usage:"
+    void . traverse (putStrLn . unpack) $ invocations @p
+  hoist _ _ = HelpProgramT
+  invocations = [mempty]
+
+
 instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t)) => HasProgram (Opt name long short t ... p) where
   newtype ProgramT (Opt name long short t ... p) m = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m }
   run f = Action $ \State{..} -> do
@@ -240,11 +251,11 @@ named = NamedProgramT
 flag :: KnownSymbol f => (Bool -> ProgramT p m) -> ProgramT (Flag f ... p) m
 flag = FlagProgramT
 
-toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m ) => ProgramT p m -> ProgramT (Named s ... p + Raw) m
-toplevel p = named p <+> usage where
-  usage = raw $ do
-    liftIO $ putStrLn "usage:"
-    liftIO $ void . traverse (putStrLn . unpack) $ invocations @(Named s ... p)
+toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m ) => ProgramT p m -> ProgramT (Named s ... p + Help (Named s ... p)) m
+toplevel p = named p <+> help where
+
+help :: HasProgram p => ProgramT (Help p) m
+help = HelpProgramT
 
 (<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
 (<+>) = (:+:)

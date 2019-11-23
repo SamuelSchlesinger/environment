@@ -33,7 +33,7 @@ more usably. We can see the type of toplevel in Commander.hs:
 ```haskell
 toplevel :: forall s p. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m
-         -> ProgramT (Named s ... p + Raw) m
+         -> ProgramT (Named s ... p + Help (Named s ... p)) m
 ```
 
 This allows us to use a type parameter "file-reader" to name our program at the top level.
