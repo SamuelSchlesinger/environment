@@ -171,14 +171,13 @@ instance HasProgram p => HasProgram (Help p) where
   hoist _ _ = HelpProgramT
   invocations = [mempty]
 
-
-instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender (Maybe t)) => HasProgram (Opt name long short t & p) where
+instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender t) => HasProgram (Opt name long short t & p) where
   newtype ProgramT (Opt name long short t & p) m a = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m a }
   run f = Action $ \State{..} -> do
     case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
       Just opt' -> 
         case unrender opt' of
-          Just t -> return (run (unOptProgramT f t), State{..})
+          Just t -> return (run (unOptProgramT f (Just t)), State{..})
           Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
@@ -226,8 +225,8 @@ initialState = do
 commander_ :: HasProgram p => ProgramT p IO a -> IO ()
 commander_ prog = void $ initialState >>= runCommanderT (run prog)
 
-commander :: HasProgram p => ProgramT p IO a -> IO [Event]
-commander prog = fmap fst $ initialState >>= runCommanderT (run prog)
+commander :: HasProgram p => ProgramT p IO a -> IO ([Event], Maybe a)
+commander prog = initialState >>= runCommanderT (run prog)
 
 arg :: KnownSymbol name => (x -> ProgramT p m a) -> ProgramT (Arg name x & p) m a 
 arg = ArgProgramT
