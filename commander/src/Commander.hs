@@ -16,7 +16,6 @@ import Data.Text (Text, pack, unpack)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import System.Environment (getArgs)
 import Data.Text.Read (decimal, signed)
-import qualified Control.Monad.Stack.Trans as Stack
 
 data Arg :: Symbol -> * -> *
 
@@ -86,11 +85,6 @@ runCommanderT (Victory summary a) _ = return (summary, Just a)
 instance (Monad m, Monoid summary) => Applicative (CommanderT summary state m) where
   (<*>) = ap
   pure = Victory mempty
-
-instance Monoid summary => Stack.MonadTrans (CommanderT summary state) where
-  lift ma = Action \state -> do
-    a <- ma
-    return (pure a, state)
 
 instance Monoid summary => MonadTrans (CommanderT summary state) where
   lift ma = Action \state -> do

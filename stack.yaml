@@ -1,6 +1,4 @@
 resolver: nightly-2019-10-27
 packages:
-- ./environment-core
 - ./commander
-- ./mtsl
 - ./scripts
