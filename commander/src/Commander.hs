@@ -240,6 +240,12 @@ named = NamedProgramT
 flag :: KnownSymbol f => (Bool -> ProgramT p m) -> ProgramT (Flag f ... p) m
 flag = FlagProgramT
 
+toplevel :: forall s p. (HasProgram p, KnownSymbol s) => ProgramT p IO -> ProgramT (Named s ... p + Raw) IO
+toplevel p = named p <+> usage where
+  usage = raw $ do
+    putStrLn "usage:"
+    void . traverse (putStrLn . unpack) $ invocations @p
+
 (<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
 (<+>) = (:+:)
 

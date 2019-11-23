@@ -19,11 +19,11 @@ usage = raw $ do
 main :: IO ()
 main = commander_ . (<+> usage) $ arg @"script-name" @FilePath \scriptName -> raw $ do
   env <- getEnv "ENVIRONMENT_BASE_PATH"
-  let scriptSrcFilePath = env ++ "/scripts/src/" ++ scriptName ++ ".hs"
-  doesFileExist scriptSrcFilePath >>= \case
+  let scriptFilePath = env ++ "/scripts/src/" ++ scriptName ++ ".hs"
+  doesFileExist scriptFilePath >>= \case
     True -> do 
       setCurrentDirectory env
-      callProcess "vim" [scriptSrcFilePath]
+      callProcess "vim" [scriptFilePath]
       callProcess "stack" ["install"]
     False -> do
-      hPutStr stderr ("edit-hs-script: script with name " <> scriptName <> " does not already exist.")
+      hPutStr stderr ("edit-script: script with name " <> scriptName <> " does not already exist.")
