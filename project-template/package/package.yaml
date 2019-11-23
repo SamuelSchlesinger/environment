@@ -1,0 +1,30 @@
+_common: !include "../shared.yaml"
+
+name: package
+<<: *common
+
+dependencies:
+  - base
+
+library:
+  source-dirs:
+    - src
+  dependencies:
+    - base
+  <<: *library
+
+executables:
+  exe:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - package
+    <<: *executable
+
+tests:
+  test:
+    main: Test.hs
+    source-dirs: test
+    dependencies:
+      - package
+    <<: *test

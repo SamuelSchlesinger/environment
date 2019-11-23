@@ -33,3 +33,14 @@ executables:
       - commander
       - process
       - directory
+  new-project:
+    main: new-project.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable

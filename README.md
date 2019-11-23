@@ -1,12 +1,17 @@
 # Environment
 
-This is a project that I use as a Haskell scripting environment. 
+This is a project that I use as a vim, Haskell scripting environment. 
 To install this environment, one needs the [stack](https://docs.haskellstack.org/)
 build tool, and to have the following environment variable set (I have it being set
-in my .bashrc file.
+in my .bashrc file. It can be easily adapted to any other editor.
 
 ```bash
 export ENVIRONMENT_BASE_PATH=<path-of-this-folder>
+```
+
+The other thing you have to do is the following command
+```bash
+stack install scripts:new-script scripts:edit-script
 ```
 
 The two main scripts are new-script and edit-script, which add and change scripts
