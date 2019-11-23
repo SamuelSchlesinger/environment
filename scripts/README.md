@@ -1,3 +1,3 @@
-# commander
+# scripts
 
-A servant like system for command line programs.
+Useful scripts that I use.
