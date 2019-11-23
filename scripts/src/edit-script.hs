@@ -8,7 +8,7 @@ import System.Directory
 import Commander
 
 main :: IO ()
-main = commander_ . toplevel @"edit-script" $ arg @"script-name" \scriptName -> raw $ do
+main = command_ . toplevel @"edit-script" $ arg @"script-name" \scriptName -> raw $ do
   env <- getEnv "ENVIRONMENT_BASE_PATH"
   let scriptFilePath = env ++ "/scripts/src/" ++ scriptName ++ ".hs"
   doesFileExist scriptFilePath >>= \case

@@ -222,11 +222,11 @@ initialState = do
         go opts args flags (x : y) = go opts (pack x : args) flags y
         go opts args flags [] = (opts, reverse args, flags)
 
-commander_ :: HasProgram p => ProgramT p IO a -> IO ()
-commander_ prog = void $ initialState >>= runCommanderT (run prog)
+command_ :: HasProgram p => ProgramT p IO a -> IO ()
+command_ prog = void $ initialState >>= runCommanderT (run prog)
 
-commander :: HasProgram p => ProgramT p IO a -> IO ([Event], Maybe a)
-commander prog = initialState >>= runCommanderT (run prog)
+command :: HasProgram p => ProgramT p IO a -> IO ([Event], Maybe a)
+command prog = initialState >>= runCommanderT (run prog)
 
 arg :: KnownSymbol name => (x -> ProgramT p m a) -> ProgramT (Arg name x & p) m a 
 arg = ArgProgramT

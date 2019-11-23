@@ -33,7 +33,7 @@ main = commander_ . toplevel @"file" $ (sub @"reader" fileReader <+> sub @"write
       writeFile fileName newContents
   fileReader =
     arg @"file-name" \fileName ->
-    opt @"print-after" @"print-after" @"p" \printAfter -> raw do
+    opt @"message-to-print-after" @"print-after" @"p" \printAfter -> raw do
       contents <- readFile fileName
       putStrLn contents
       maybe empty putStrLn printAfter
@@ -55,8 +55,12 @@ help combinator. Here are the results:
 
 ```
 usage:
-file-program file-reader <file-name> -p <print-after>
-file-program file-reader <file-name> --print-after <print-after>
-file-program file-writer <file-name> <new-contents> ~print-former-contents
+file reader <file-name> -p <print-after>
+file reader <file-name> --print-after <message-to-print-after>
+file writer <file-name> <new-contents> ~print-former-contents
 ```
 
+I think that these simple help messages are sufficient for everything I ever script for, but if you want
+to submit a PR which improves them, please feel free. I can do a discussion of the machinery underlying
+the library at some point, but it is modeled off of the [servant](https://www.servant.dev) library at its 
+core, but it is much simpler, because it solves a much simpler problem.

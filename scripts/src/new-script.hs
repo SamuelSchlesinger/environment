@@ -7,7 +7,7 @@ import Control.Monad
 import System.IO
 
 main :: IO ()
-main = commander_ . toplevel @"new-script" $ arg @"script-name" @String \scriptName -> raw $ do
+main = command_ . toplevel @"new-script" $ arg @"script-name" @String \scriptName -> raw $ do
   env <- getEnv "ENVIRONMENT_BASE_PATH"
   let scriptFilePath = env ++ "/scripts/src/" ++ scriptName ++ ".hs"
   doesFileExist scriptFilePath >>= \case
