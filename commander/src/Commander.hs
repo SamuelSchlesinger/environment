@@ -244,7 +244,7 @@ toplevel :: forall s p. (HasProgram p, KnownSymbol s) => ProgramT p IO -> Progra
 toplevel p = named p <+> usage where
   usage = raw $ do
     putStrLn "usage:"
-    void . traverse (putStrLn . unpack) $ invocations @p
+    void . traverse (putStrLn . unpack) $ invocations @(Named s ... p)
 
 (<+>) :: ProgramT p m -> ProgramT q m -> ProgramT (p + q) m
 (<+>) = (:+:)
