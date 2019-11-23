@@ -51,7 +51,6 @@
 
 - &executable
   ghc-options:
-    - -Wall
     - -Werror
     - -fwarn-tabs
     - -Wincomplete-uni-patterns
