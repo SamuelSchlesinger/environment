@@ -13,3 +13,4 @@ instance Compare 'Z 'Z 'EQ
 instance Compare ('S n) 'Z 'GT
 instance Compare 'Z ('S n) 'LT
 instance Compare n m o => Compare ('S n) ('S m) o
+

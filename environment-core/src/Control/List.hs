@@ -13,3 +13,7 @@ type family Ordered (ms :: [k]) (ts :: [k]) :: Constraint where
   Ordered (x ': y ': ms) ts = (Prior x y ts, Ordered (y ': ms) ts)
   Ordered (x ': '[])     ts = ()
   Ordered '[]            ts = ()
+
+type family ForAll (cs :: [k]) (prop :: k -> Constraint) :: Constraint where
+  ForAll (c ': cs) prop = (prop c, ForAll cs prop)
+  ForAll '[] prop = ()
