@@ -30,4 +30,4 @@ main = commander_ . toplevel @"new-script" $ arg @"script-name" @String \scriptN
        \      - bytestring\n\
        \    <<: *executable\n"
       callProcess "vim" [scriptFilePath]
-      callProcess "stack" ["install"]
+      callProcess "stack" ["install", "scripts:" ++ scriptName]
