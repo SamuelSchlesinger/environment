@@ -110,12 +110,43 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
     a <- liftIO ma
     return (pure a, state)
 
+-- Return laws:
+-- Goal: return a >>= k = k a
+-- Proof: return a >>= k 
+--      = Victory mempty a >>= k 
+--      = summaryAction mempty (k a) 
+--      = k a
+-- Goal: m >>= return = m
+-- Proof:
+--   Case 1: Defeat summary >>= return = Defeat summary
+--   Case 2: Victory summary a >>= return 
+--         = summaryAction summary (Victory mempty a)
+--         = Victory summary a
+--   Case 3: Action action >>= return
+--         = Action \state -> do
+--             (action', state') <- action state
+--             return (action' >>= return, state')
+--
+-- Case 3 serves as an inductive proof only if action' is a strictly smaller action
+-- than action!
+--
+--  Bind laws:
+--  Goal: m >>= (\x -> k x >>= h) = (m >>= k) >>= h
+--  Proof: 
+--    Case 1: Defeat summary >>= _ = Defeat summary
+--    Case 2: Victory summary a >>= (\x -> k x >>= f)
+--          = summaryAction (k a) >>= f
+--          = (Victory summary a >>= k) >>= f
+--    Case 3: Action action >>= (\x -> k x >>= h)
+--          = Action \state -> do
+--              (action', state') <- action state
+--              return (action' >>= (\x -> k x >>= h), state')
+--          = Action \state -> do
+--              (action', state') <- action state
+--              return ((action' >>= k) >>= h, state') 
 instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
   Defeat summary >>= _ = Defeat summary
-  Victory summary a >>= f = case f a of
-    Action action -> Action \state -> action state
-    Defeat summary' -> Defeat (summary <> summary')
-    Victory summary' b -> Victory (summary <> summary') b
+  Victory summary a >>= f = summaryAction summary (f a)
   Action action >>= f = Action \state -> do
     (action', state') <- action state
     return (action' >>= f, state')
