@@ -33,7 +33,7 @@ file = sub @"writer" (arg @"filename" \filename ->
                         raw $ readFile filename >>= putStrLn)
 ``` 
 Here is a complete example of a script that you could write using
-new-script that utilizes most of the combinators in the library.:
+new-script that utilizes most of the combinators in the library.
 ```haskell
 import Commander (arg, opt, flag, raw, toplevel, sub, (<+>))
 import Control.Applicative (empty, when)
