@@ -23,7 +23,7 @@ data Opt :: Symbol -> Symbol -> Symbol -> * -> *
 
 data Named :: Symbol -> *
 
-data Help :: * -> *
+data Usage :: * -> *
 
 data (&) :: k -> * -> *
 infixr 4 &
@@ -68,13 +68,27 @@ data CommanderT summary state m a
   | Victory summary a
   deriving Functor
 
-summaryAction :: (Monoid summary, Monad m) => summary -> CommanderT summary state m a -> CommanderT summary state m a
+data Documentation
+  = DocSub String String [(String, Documentation)]
+  | DocFlag String (Maybe String)
+  | DocOpt String String String (Maybe String) Documentation
+  | DocArg String (Maybe String) Documentation
+  | DocNamed String (Maybe String) Documentation
+  deriving (Eq, Show, Read)
+
+summaryAction :: (Monoid summary, Monad m) 
+              => summary 
+              -> CommanderT summary state m a 
+              -> CommanderT summary state m a
 summaryAction summary (Defeat summary') = Defeat (summary <> summary')
 summaryAction summary (Victory summary' a) = Victory (summary <> summary') a
 summaryAction summary (Action action) = Action \state -> action state >>= \case
   (action', state') -> return (summaryAction summary action', state')
 
-runCommanderT :: (Monoid summary, Monad m) => CommanderT summary state m a -> state -> m (summary, Maybe a)
+runCommanderT :: (Monoid summary, Monad m) 
+              => CommanderT summary state m a 
+              -> state 
+              -> m (summary, Maybe a)
 runCommanderT (Action action) state = do
   (action', state') <- action state
   (summary, m) <- runCommanderT action' state'
@@ -99,7 +113,7 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
   Defeat summary >>= _ = Defeat summary
   Victory summary a >>= f = case f a of
-    Action action -> Action \state -> (\(action', state') -> (action', state')) <$> action state
+    Action action -> Action \state -> action state
     Defeat summary' -> Defeat (summary <> summary')
     Victory summary' b -> Victory (summary <> summary') b
   Action action >>= f = Action \state -> do
@@ -161,14 +175,14 @@ instance HasProgram Raw where
   hoist n (RawProgramT m) = RawProgramT (n m)
   invocations = [mempty]
 
-instance HasProgram p => HasProgram (Help p) where
-  data ProgramT (Help p) m a = HelpProgramT
+instance HasProgram p => HasProgram (Usage p) where
+  data ProgramT (Usage p) m a = UsageProgramT
   run _ = Action \s -> do
     liftIO $ do
       putStrLn "usage:"
       void . traverse (putStrLn . unpack) $ invocations @p
     return (Defeat [], s)
-  hoist _ _ = HelpProgramT
+  hoist _ _ = UsageProgramT
   invocations = [mempty]
 
 instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender t) => HasProgram (Opt name long short t & p) where
@@ -177,7 +191,7 @@ instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, U
     case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
       Just opt' -> 
         case unrender opt' of
-          Just t -> return (run (unOptProgramT f (Just t)), State{..})
+          Just t -> return (summaryAction [GoodOption opt'] $ run (unOptProgramT f (Just t)), State{..})
           Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
@@ -222,37 +236,59 @@ initialState = do
         go opts args flags (x : y) = go opts (pack x : args) flags y
         go opts args flags [] = (opts, reverse args, flags)
 
-command_ :: HasProgram p => ProgramT p IO a -> IO ()
+command_ :: HasProgram p 
+         => ProgramT p IO a 
+         -> IO ()
 command_ prog = void $ initialState >>= runCommanderT (run prog)
 
-command :: HasProgram p => ProgramT p IO a -> IO ([Event], Maybe a)
+command :: HasProgram p 
+        => ProgramT p IO a 
+        -> IO ([Event], Maybe a)
 command prog = initialState >>= runCommanderT (run prog)
 
-arg :: KnownSymbol name => (x -> ProgramT p m a) -> ProgramT (Arg name x & p) m a 
+arg :: KnownSymbol name
+    => (x -> ProgramT p m a) 
+    -> ProgramT (Arg name x & p) m a 
 arg = ArgProgramT
 
-opt :: (KnownSymbol name, KnownSymbol long, KnownSymbol short) => (Maybe x -> ProgramT p m a) -> ProgramT (Opt name long short x & p) m a
+-- | Option combinator, taking a name for the argument, a long option
+-- name and a short option name.
+opt :: (KnownSymbol name, KnownSymbol long, KnownSymbol short) 
+    => (Maybe x -> ProgramT p m a) 
+    -> ProgramT (Opt name long short x & p) m a
 opt = OptProgramT
 
-raw :: m a -> ProgramT Raw m a
+-- | Raw monadic combinator
+raw :: m a 
+    -> ProgramT Raw m a
 raw = RawProgramT
 
-sub :: KnownSymbol s => ProgramT p m a -> ProgramT (s & p) m a
+-- | Subcommand combinator
+sub :: KnownSymbol s 
+    => ProgramT p m a 
+    -> ProgramT (s & p) m a
 sub = SegProgramT
 
-named :: KnownSymbol s => ProgramT p m a -> ProgramT (Named s  & p) m a
+-- | Named command combinator, should only really be used at the top level.
+named :: KnownSymbol s 
+      => ProgramT p m a 
+      -> ProgramT (Named s & p) m a
 named = NamedProgramT
 
-flag :: KnownSymbol f => (Bool -> ProgramT p m a) -> ProgramT (Flag f & p) m a
+-- | Boolean flag combinator
+flag :: KnownSymbol f 
+     => (Bool -> ProgramT p m a) 
+     -> ProgramT (Flag f & p) m a
 flag = FlagProgramT
 
-toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m ) => ProgramT p m a -> ProgramT (Named s & p + Help (Named s & p)) m a
-toplevel p = named p <+> help where
+-- | A convenience combinator that constructs the program I often want
+-- to run out of a program I want to write.
+toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m) 
+         => ProgramT p m a 
+         -> ProgramT (Named s & p + Usage (Named s & p)) m a
+toplevel p = named p :+: usage where
 
-help :: HasProgram p => ProgramT (Help p) m a
-help = HelpProgramT
-
-(<+>) :: ProgramT p m a -> ProgramT q m a -> ProgramT (p + q) m a
-(<+>) = (:+:)
-
-infixr 2 <+>
+-- | A meta-combinator that takes a type-level description of a command 
+-- line program and produces a simple usage program.
+usage :: HasProgram p => ProgramT (Usage p) m a
+usage = UsageProgramT
