@@ -15,8 +15,8 @@ instance Unrender Language where
   unrender _ = Nothing
 
 main :: IO ()
-main = command_ . toplevel @"new-project" 
-  $ arg @"project-name" \projectName ->
+main = command_ . toplevel @"new-project" $ 
+  arg @"project-name" \projectName ->
     opt @"initial-branch-name" @"branch" @"b" \maybeBranchName -> 
     opt @"programming-language" @"language" @"l" \language -> 
       let haskellNewProject =  
