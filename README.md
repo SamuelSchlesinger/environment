@@ -74,7 +74,7 @@ now!
 Lets say I use this program the wrong way, for instance trying to call "file-program blah".
 It will give you back some feedback! At the moment, the feedback is very dumb, just a list
 of the valid calls. It is the toplevel function that does this, under the hood using the
-help combinator. Here are the results:
+usage combinator. Here are the results:
 
 ```
 usage:
