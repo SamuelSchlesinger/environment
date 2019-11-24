@@ -113,7 +113,7 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
   Defeat summary >>= _ = Defeat summary
   Victory summary a >>= f = case f a of
-    Action action -> Action \state -> (\(action', state') -> (action', state')) <$> action state
+    Action action -> Action \state -> action state
     Defeat summary' -> Defeat (summary <> summary')
     Victory summary' b -> Victory (summary <> summary') b
   Action action >>= f = Action \state -> do
