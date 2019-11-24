@@ -77,3 +77,36 @@ executables:
       - text
       - bytestring
     <<: *executable
+  bad:
+    main: bad.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  good:
+    main: good.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  sound:
+    main: sound.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
