@@ -13,9 +13,11 @@
   - DataKinds
   - DefaultSignatures
   - DeriveDataTypeable
+  - DeriveFunctor
   - DeriveGeneric
   - DerivingStrategies
   - EmptyDataDecls
+  - EmptyCase
   - ExistentialQuantification
   - FlexibleContexts
   - FlexibleInstances
@@ -28,6 +30,8 @@
   - MultiParamTypeClasses
   - NoMonomorphismRestriction
   - NPlusKPatterns
+  - NamedFieldPuns
+  - NumericUnderscores
   - OverloadedStrings
   - PackageImports
   - PatternSynonyms
@@ -35,8 +39,6 @@
   - QuantifiedConstraints
   - QuasiQuotes
   - RankNTypes
-  - NamedFieldPuns
-  - NumericUnderscores
   - RecordWildCards
   - RecursiveDo
   - ScopedTypeVariables
