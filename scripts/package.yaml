@@ -6,14 +6,6 @@ name: scripts
 dependencies:
   - base
 
-tests:
-  scripts-test:
-    main: Test.hs
-    source-dirs: test
-    dependencies:
-      - scripts
-    <<: *test
-
 executables:
   edit-script:
     main: edit-script.hs
@@ -35,6 +27,17 @@ executables:
       - directory
   new-project:
     main: new-project.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  list-scripts:
+    main: list-scripts.hs
     source-dirs: src
     dependencies:
       - base
