@@ -19,7 +19,7 @@ import Data.Text.Read (decimal, signed)
 
 data Arg :: Symbol -> * -> *
 
-data Opt :: Symbol -> Symbol -> Symbol -> * -> *
+data Opt :: Symbol -> Symbol -> * -> *
 
 data Named :: Symbol -> *
 
@@ -216,18 +216,17 @@ instance HasProgram p => HasProgram (Usage p) where
   hoist _ _ = UsageProgramT
   invocations = [mempty]
 
-instance (KnownSymbol name, KnownSymbol long, KnownSymbol short, HasProgram p, Unrender t) => HasProgram (Opt name long short t & p) where
-  newtype ProgramT (Opt name long short t & p) m a = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m a }
+instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
+  newtype ProgramT (Opt option name t & p) m a = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m a }
   run f = Action $ \State{..} -> do
-    case HashMap.lookup (pack $ symbolVal (Proxy @long)) options <|> HashMap.lookup (pack $ symbolVal (Proxy @short)) options of
+    case HashMap.lookup (pack $ symbolVal (Proxy @option)) options of
       Just opt' -> 
         case unrender opt' of
           Just t -> return (summaryAction [GoodOption opt'] $ run (unOptProgramT f (Just t)), State{..})
-          Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @short)) (pack (symbolVal $ Proxy @long))], State{..})
+          Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @option)) (pack (symbolVal $ Proxy @name))], State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
-  invocations = [ (("-" <> (pack $ symbolVal (Proxy @short)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)
-                , (("--" <> (pack $ symbolVal (Proxy @long)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
+  invocations = [(("-" <> (pack $ symbolVal (Proxy @option)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
@@ -262,7 +261,6 @@ initialState = do
       takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
       takeOptions = go [] [] [] where
         go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
-        go opts args flags (('-':'-':x) : y : z) = go ((pack x, pack y) : opts) args flags z 
         go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
         go opts args flags (x : y) = go opts (pack x : args) flags y
         go opts args flags [] = (opts, reverse args, flags)
@@ -284,9 +282,9 @@ arg = ArgProgramT
 
 -- | Option combinator, taking a name for the argument, a long option
 -- name and a short option name.
-opt :: (KnownSymbol name, KnownSymbol long, KnownSymbol short) 
+opt :: (KnownSymbol name, KnownSymbol option)
     => (Maybe x -> ProgramT p m a) 
-    -> ProgramT (Opt name long short x & p) m a
+    -> ProgramT (Opt option name x & p) m a
 opt = OptProgramT
 
 -- | Raw monadic combinator
