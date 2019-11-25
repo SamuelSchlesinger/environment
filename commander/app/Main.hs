@@ -3,13 +3,13 @@ module Main where
 import Commander 
 import Prelude
 
-main :: IO ()
-main = command_ (toplevel @"commander-example" file)
+type File = Named "file"
+          & Arg "filename" FilePath 
+          & ("write" & Arg "contents" String & Raw
+          +  "read"  & Raw) 
 
-file :: ProgramT ("writer" & Arg "filename" FilePath & Arg "contents" String & Raw
-                + "reader" & Arg "filename" FilePath                         & Raw) IO ()
-file = sub @"writer" (arg @"filename" \filename -> 
-                      arg @"contents" \contents -> 
-                        raw $ writeFile filename contents)
-   :+: sub @"reader" (arg @"filename" \filename ->                              
-                        raw $ readFile filename >>= putStrLn)
+file :: ProgramT File IO ()
+file = named $ arg \a -> (sub $ arg (raw . writeFile a)) :+: (sub . raw $ readFile a >>= putStrLn)
+
+main :: IO ()
+main = command (file :+: usage @File) >>= print

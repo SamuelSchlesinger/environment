@@ -77,3 +77,25 @@ I think that these simple help messages are sufficient for everything I ever scr
 to submit a PR which improves them, please feel free. I can do a discussion of the machinery underlying
 the library at some point, but it is modeled off of the [servant](https://www.servant.dev) library at its 
 core, but it is much simpler, because it solves a much simpler problem.
+
+Here is an example of a program written with an explicit type signature, and instead of the toplevel
+combinator I use the usage combinator explicitly. This is only really useful when you use explicit
+type signatures, as otherwise you would have to describe it explicitly at the use site of usage.
+
+```haskell
+module Main where
+
+import Commander
+import Prelude
+
+type File = Named "file"
+          & Arg "filename" FilePath
+          & ("write" & Arg "contents" String & Raw
+          +  "read"  & Raw)
+
+file :: ProgramT File IO ()
+file = named @"file" $ arg \a -> (sub $ arg (raw . writeFile a)) :+: (sub . raw $ readFile a >>= putStrLn)
+
+main :: IO ()
+main = command_ (file :+: usage @File)
+```
