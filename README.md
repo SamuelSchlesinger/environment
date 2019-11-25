@@ -50,7 +50,7 @@ main = commander_ . toplevel @"file" $ (sub @"reader" fileReader <+> sub @"write
       writeFile fileName newContents
   fileReader =
     arg @"file-name" \fileName ->
-    opt @"message-to-print-after" @"print-after" @"p" \printAfter -> raw do
+    opt @"p" @"print-after" \printAfter -> raw do
       contents <- readFile fileName
       putStrLn contents
       maybe empty putStrLn printAfter
@@ -71,7 +71,6 @@ usage combinator. Here are the results:
 ```
 usage:
 file reader <file-name> -p <print-after>
-file reader <file-name> --print-after <message-to-print-after>
 file writer <file-name> <new-contents> ~print-former-contents
 ```
 I think that these simple help messages are sufficient for everything I ever script for, but if you want
