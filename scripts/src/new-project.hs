@@ -19,8 +19,8 @@ instance Unrender Language where
 main :: IO ()
 main = command_ . toplevel @"new-project" $ 
   arg @"project-name" \projectName ->
-    opt @"initial-branch-name" @"branch" @"b" \maybeBranchName -> 
-    opt @"programming-language" @"language" @"l" \language -> 
+    opt @"b" @"initial-branch-name" \maybeBranchName -> 
+    opt @"l" @"programming-language" \language -> 
       let branchName = maybe "dev" id maybeBranchName
           gitStart = do
             callProcess "git" ["init"]
