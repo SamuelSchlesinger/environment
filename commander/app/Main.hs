@@ -12,4 +12,4 @@ file :: ProgramT File IO ()
 file = named $ arg \a -> (sub $ arg (raw . writeFile a)) :+: (sub . raw $ readFile a >>= putStrLn)
 
 main :: IO ()
-main = command_ (file :+: usage @File)
+main = command (file :+: usage @File) >>= print

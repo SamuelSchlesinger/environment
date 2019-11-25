@@ -186,7 +186,8 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     case arguments of
       (x : xs) -> 
         case unrender x of
-          Just t -> return (summaryAction [GoodArgument $ pack $ symbolVal (Proxy @name)] $ run (unArgProgramT f t), State{ arguments = xs, .. })  
+          Just t -> return (summaryAction [GoodArgument $ pack $ symbolVal (Proxy @name)] 
+                          $ run (unArgProgramT f t), State{ arguments = xs, .. })  
           Nothing -> return (Defeat [BadArgument x (pack $ symbolVal (Proxy @name))], State{..})
       [] -> return (Defeat mempty, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
@@ -246,11 +247,18 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg & p) where
   newtype ProgramT (seg & p) m a = SegProgramT { unSegProgramT :: ProgramT p m a }
   run s = Action $ \State{..} -> do 
     case arguments of
-      (x : xs) -> if x == pack (symbolVal $ Proxy @seg) then return (summaryAction [TryingBranch (pack . symbolVal $ Proxy @seg)] $ run $ unSegProgramT s, State{arguments = xs, ..})
-                                                        else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
-      [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg], State{..})
+      (x : xs) -> 
+        if x == pack (symbolVal $ Proxy @seg) 
+          then return (summaryAction [TryingBranch (pack . symbolVal $ Proxy @seg)] 
+                      $ run $ unSegProgramT s
+                      , State{arguments = xs, ..})
+          else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg]
+                      , State{..})
+      [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg]
+                   , State{..})
   hoist n = SegProgramT . hoist n . unSegProgramT
-  invocations = [((pack $ symbolVal (Proxy @seg) <> " ") <> )] <*> invocations @p
+  invocations = [((pack $ symbolVal (Proxy @seg) <> " ") <> )] 
+            <*> invocations @p
  
 initialState :: IO State
 initialState = do
