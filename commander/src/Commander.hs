@@ -143,7 +143,37 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 --              return (action' >>= (\x -> k x >>= h), state')
 --          = Action \state -> do
 --              (action', state') <- action state
---              return ((action' >>= k) >>= h, state') 
+--              return ((action' >>= k) >>= h, state') -- by IH
+--    On the other hand,
+--            (Action action >>= k) >>= h
+--          = Action (\state -> do
+--              (action', state') <- action state
+--              return (action' >>= k, state') >>= h
+--          = Action \state -> do
+--              (action', state') <- action state
+--              return ((action' >>= k) >>= h, state')
+--               
+--   This completes our proof for the case when these are finite.
+--   Basically, we require that the stream an action produces is strictly
+--   smaller than any other streams, for all state inputs. The ways that we
+--   use this monad transformer satisify this constraint. If this
+--   constraint is not met, many of our functions will return bottom.
+--
+--   We can certainly have functions that operate on these things and
+--   change them safely, without violating this constraint. All of the
+--   functions that we define on CommanderT programs preserve this
+--   property.
+--
+--   An example of a violating term might be:
+--
+--   violator :: CommanderT summary state m
+--   violator = Action (\state -> return (violator, state))
+--
+--   The principled way to include this type would be to parameterize it by
+--   a natural number and have that natural number decrease over time, but
+--   to enforce that in Haskell we couldn't have the monad instance
+--   anyways. This is the way to go for now, despite the type violating the
+--   monad laws potentially for infinite inputs. 
 instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
   Defeat summary >>= _ = Defeat summary
   Victory summary a >>= f = summaryAction summary (f a)
