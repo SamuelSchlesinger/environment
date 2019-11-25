@@ -282,7 +282,7 @@ arg = ArgProgramT
 
 -- | Option combinator, taking a name for the argument, a long option
 -- name and a short option name.
-opt :: (KnownSymbol name, KnownSymbol option)
+opt :: (KnownSymbol option, KnownSymbol name)
     => (Maybe x -> ProgramT p m a) 
     -> ProgramT (Opt option name x & p) m a
 opt = OptProgramT
