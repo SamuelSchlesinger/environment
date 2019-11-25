@@ -6,9 +6,11 @@ import System.Environment
 data Language = Haskell | Rust
 
 instance Unrender Language where
+  unrender "r" = Just Rust
   unrender "rs" = Just Rust
   unrender "rust" = Just Rust
   unrender "Rust" = Just Rust
+  unrender "h" = Just Haskell
   unrender "hs" = Just Haskell
   unrender "haskell" = Just Haskell
   unrender "Haskell" = Just Haskell
@@ -17,21 +19,30 @@ instance Unrender Language where
 main :: IO ()
 main = command_ . toplevel @"new-project" $ 
   arg @"project-name" \projectName ->
-    opt @"initial-branch-name" @"branch" @"b" \maybeBranchName -> 
-    opt @"programming-language" @"language" @"l" \language -> 
-      let haskellNewProject =  
+    opt @"b" @"initial-branch-name" \maybeBranchName -> 
+    opt @"l" @"programming-language" \language -> 
+      let branchName = maybe "dev" id maybeBranchName
+          gitStart = do
+            callProcess "git" ["init"]
+            callProcess "git" ["add", "."]
+            callProcess "git" ["checkout", "-b", branchName]
+            callProcess "git" ["commit", "-m", "Genesis block"]
+          rustNewProject =
             raw do
-              let branchName = maybe "dev" id maybeBranchName
+              currentDir <- getCurrentDirectory
+              let projectDir = currentDir <> "/" <> projectName
+              callProcess "cargo" ["new", projectName]
+              setCurrentDirectory projectDir
+              gitStart
+          haskellNewProject =  
+            raw do
               currentDir <- getCurrentDirectory
               env <- getEnv "ENVIRONMENT_BASE_PATH"
               let projectDir = currentDir <> "/" <> projectName
               callProcess "cp" ["-R", env ++ "/project-template", projectDir]
               setCurrentDirectory projectDir
-              callProcess "git" ["init"]
-              callProcess "git" ["add", "."]
-              callProcess "git" ["checkout", "-b", branchName]
-              callProcess "git" ["commit", "-m", "Genesis block"]
+              gitStart
       in case language of
            Just Haskell -> haskellNewProject
-           Just Rust -> raw $ putStrLn "FIXME: new-project does not support rust at the moment"
+           Just Rust -> rustNewProject
            Nothing -> haskellNewProject
