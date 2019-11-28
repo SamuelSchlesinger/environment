@@ -113,3 +113,25 @@ executables:
       - text
       - bytestring
     <<: *executable
+  start-postgres:
+    main: start-postgres.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
+  stop-postgres:
+    main: stop-postgres.hs
+    source-dirs: src
+    dependencies:
+      - base
+      - commander
+      - process
+      - directory
+      - text
+      - bytestring
+    <<: *executable
