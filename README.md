@@ -99,3 +99,25 @@ file = named @"file" $ arg \a -> (sub $ arg (raw . writeFile a)) :+: (sub . raw 
 main :: IO ()
 main = command_ (file :+: usage @File)
 ```
+
+On my machine, I have more scripts than are present in this branch of the repository. Here is the result of
+calling the list-scripts command:
+
+```bash
+ ~/environment : [sam] ⊨ list-scripts
+edit-script
+new-script
+new-project
+soviet
+wow
+fart
+bad
+good
+sound
+list-scripts
+start-postgres
+stop-postgres
+```
+
+I find that it is easiest to use a fully featured programming language that isn't bash to write my scripts,
+and if anyone else finds this repository useful, I will be glad!

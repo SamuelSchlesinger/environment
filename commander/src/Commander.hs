@@ -62,10 +62,10 @@ instance Unrender Word where
     h (n, "") = Just n
     h _ = Nothing
 
-data CommanderT summary state m a
-  = Action (state -> m (CommanderT summary state m a, state))
-  | Defeat summary
-  | Victory summary a
+data CommanderT state m a
+  = Action (state -> m (CommanderT state m a, state))
+  | Defeat
+  | Victory a
   deriving Functor
 
 data Documentation
@@ -76,36 +76,27 @@ data Documentation
   | DocNamed String (Maybe String) Documentation
   deriving (Eq, Show, Read)
 
-summaryAction :: (Monoid summary, Monad m) 
-              => summary 
-              -> CommanderT summary state m a 
-              -> CommanderT summary state m a
-summaryAction summary (Defeat summary') = Defeat (summary <> summary')
-summaryAction summary (Victory summary' a) = Victory (summary <> summary') a
-summaryAction summary (Action action) = Action \state -> action state >>= \case
-  (action', state') -> return (summaryAction summary action', state')
-
-runCommanderT :: (Monoid summary, Monad m) 
-              => CommanderT summary state m a 
+runCommanderT :: Monad m 
+              => CommanderT state m a 
               -> state 
-              -> m (summary, Maybe a)
+              -> m (Maybe a)
 runCommanderT (Action action) state = do
   (action', state') <- action state
-  (summary, m) <- runCommanderT action' state'
-  return (summary, m)
-runCommanderT (Defeat summary) _ = return (summary, Nothing)
-runCommanderT (Victory summary a) _ = return (summary, Just a)
+  m <- runCommanderT action' state'
+  return m
+runCommanderT Defeat _ = return Nothing
+runCommanderT (Victory a) _ = return (Just a)
 
-instance (Monad m, Monoid summary) => Applicative (CommanderT summary state m) where
+instance (Monad m) => Applicative (CommanderT state m) where
   (<*>) = ap
-  pure = Victory mempty
+  pure = Victory
 
-instance Monoid summary => MonadTrans (CommanderT summary state) where
+instance MonadTrans (CommanderT state) where
   lift ma = Action \state -> do
     a <- ma
     return (pure a, state)
 
-instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) where
+instance MonadIO m => MonadIO (CommanderT state m) where
   liftIO ma = Action \state -> do
     a <- liftIO ma
     return (pure a, state)
@@ -113,15 +104,14 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 -- Return laws:
 -- Goal: return a >>= k = k a
 -- Proof: return a >>= k 
---      = Victory mempty a >>= k 
---      = summaryAction mempty (k a) 
+--      = Victory a >>= k 
+--      = k a 
 --      = k a
 -- Goal: m >>= return = m
 -- Proof:
---   Case 1: Defeat summary >>= return = Defeat summary
---   Case 2: Victory summary a >>= return 
---         = summaryAction summary (Victory mempty a)
---         = Victory summary a
+--   Case 1: Defeat >>= return = Defeat
+--   Case 2: Victory a >>= return 
+--         = Victory a
 --   Case 3: Action action >>= return
 --         = Action \state -> do
 --             (action', state') <- action state
@@ -133,10 +123,10 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 --  Bind laws:
 --  Goal: m >>= (\x -> k x >>= h) = (m >>= k) >>= h
 --  Proof: 
---    Case 1: Defeat summary >>= _ = Defeat summary
---    Case 2: Victory summary a >>= (\x -> k x >>= f)
---          = summaryAction (k a) >>= f
---          = (Victory summary a >>= k) >>= f
+--    Case 1: Defeat >>= _ = Defeat
+--    Case 2: Victory a >>= (\x -> k x >>= f)
+--          = k a >>= f
+--          = (Victory a >>= k) >>= f
 --    Case 3: Action action >>= (\x -> k x >>= h)
 --          = Action \state -> do
 --              (action', state') <- action state
@@ -166,7 +156,7 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 --
 --   An example of a violating term might be:
 --
---   violator :: CommanderT summary state m
+--   violator :: CommanderT state m
 --   violator = Action (\state -> return (violator, state))
 --
 --   The principled way to include this type would be to parameterize it by
@@ -174,39 +164,29 @@ instance (Monoid summary, MonadIO m) => MonadIO (CommanderT summary state m) whe
 --   to enforce that in Haskell we couldn't have the monad instance
 --   anyways. This is the way to go for now, despite the type violating the
 --   monad laws potentially for infinite inputs. 
-instance (Monad m, Monoid summary) => Monad (CommanderT summary state m) where
-  Defeat summary >>= _ = Defeat summary
-  Victory summary a >>= f = summaryAction summary (f a)
+instance Monad m => Monad (CommanderT state m) where
+  Defeat >>= _ = Defeat
+  Victory a >>= f = f a
   Action action >>= f = Action \state -> do
     (action', state') <- action state
     return (action' >>= f, state')
 
-instance (Monad m, Monoid summary) => Alternative (CommanderT summary state m) where
-  empty = Defeat mempty 
-  Defeat summary <|> a  = summaryAction summary a -- we must remember out defeats
-  v@(Victory _ _) <|> _ = v -- if we have succeeded, we don't need to try another strategy
+instance Monad m => Alternative (CommanderT state m) where
+  empty = Defeat 
+  Defeat <|> a = a 
+  v@(Victory _) <|> _ = v
   Action action <|> p = Action \state -> do
     (action', state') <- action state 
-    return (action' <|> p, state')  -- go back to this idea if you don't find victory
+    return (action' <|> p, state')
 
 data State = State 
   { arguments :: [Text]
   , options :: HashMap Text Text
   , flags :: HashSet Text }
 
-data Event 
-  = BadOption Text Text Text
-  | GoodOption Text
-  | BadArgument Text Text
-  | GoodArgument Text
-  | TryingBranch Text
-  | WrongBranch Text
-  | Success
-  deriving (Show, Eq, Ord)
-
 class HasProgram p where
   data ProgramT p (m :: * -> *) a
-  run :: ProgramT p IO a -> CommanderT [Event] State IO a
+  run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   invocations :: [Text]
 
@@ -216,10 +196,9 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     case arguments of
       (x : xs) -> 
         case unrender x of
-          Just t -> return (summaryAction [GoodArgument $ pack $ symbolVal (Proxy @name)] 
-                          $ run (unArgProgramT f t), State{ arguments = xs, .. })  
-          Nothing -> return (Defeat [BadArgument x (pack $ symbolVal (Proxy @name))], State{..})
-      [] -> return (Defeat mempty, State{..})
+          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
+          Nothing -> return (Defeat, State{..})
+      [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
   invocations = [(("<" <> pack (symbolVal (Proxy @name)) <> "> ") <>)] <*> invocations @p
 
@@ -233,7 +212,7 @@ infixr 2 :+:
 
 instance HasProgram Raw where
   newtype ProgramT Raw m a = RawProgramT { unRawProgramT :: m a }
-  run = summaryAction [Success] . liftIO . unRawProgramT
+  run = liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
   invocations = [mempty]
 
@@ -243,7 +222,7 @@ instance HasProgram p => HasProgram (Usage p) where
     liftIO $ do
       putStrLn "usage:"
       void . traverse (putStrLn . unpack) $ invocations @p
-    return (Defeat [], s)
+    return (Defeat, s)
   hoist _ _ = UsageProgramT
   invocations = [mempty]
 
@@ -253,8 +232,8 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
     case HashMap.lookup (pack $ symbolVal (Proxy @option)) options of
       Just opt' -> 
         case unrender opt' of
-          Just t -> return (summaryAction [GoodOption opt'] $ run (unOptProgramT f (Just t)), State{..})
-          Nothing -> return (Defeat [BadOption opt' (pack (symbolVal $ Proxy @option)) (pack (symbolVal $ Proxy @name))], State{..})
+          Just t -> return (run (unOptProgramT f (Just t)), State{..})
+          Nothing -> return (Defeat, State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
   invocations = [(("-" <> (pack $ symbolVal (Proxy @option)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
@@ -279,13 +258,9 @@ instance (KnownSymbol seg, HasProgram p) => HasProgram (seg & p) where
     case arguments of
       (x : xs) -> 
         if x == pack (symbolVal $ Proxy @seg) 
-          then return (summaryAction [TryingBranch (pack . symbolVal $ Proxy @seg)] 
-                      $ run $ unSegProgramT s
-                      , State{arguments = xs, ..})
-          else return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg]
-                      , State{..})
-      [] -> return (Defeat $ [WrongBranch . pack . symbolVal $ Proxy @seg]
-                   , State{..})
+          then return (run $ unSegProgramT s, State{arguments = xs, ..})
+          else return (Defeat, State{..})
+      [] -> return (Defeat, State{..})
   hoist n = SegProgramT . hoist n . unSegProgramT
   invocations = [((pack $ symbolVal (Proxy @seg) <> " ") <> )] 
             <*> invocations @p
@@ -310,7 +285,7 @@ command_ prog = void $ initialState >>= runCommanderT (run prog)
 
 command :: HasProgram p 
         => ProgramT p IO a 
-        -> IO ([Event], Maybe a)
+        -> IO (Maybe a)
 command prog = initialState >>= runCommanderT (run prog)
 
 arg :: KnownSymbol name
@@ -352,8 +327,8 @@ flag = FlagProgramT
 -- to run out of a program I want to write.
 toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m a 
-         -> ProgramT (Named s & p + Usage (Named s & p)) m a
-toplevel p = named p :+: usage where
+         -> ProgramT (Named s & ("help" & Usage (Named s & p) + p)) m a
+toplevel p = named (sub usage :+: p) where
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
