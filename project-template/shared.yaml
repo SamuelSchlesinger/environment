@@ -12,6 +12,7 @@
   - ConstraintKinds
   - DataKinds
   - DefaultSignatures
+  - DeriveAnyClass
   - DeriveDataTypeable
   - DeriveFunctor
   - DeriveGeneric
